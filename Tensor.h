@@ -33,6 +33,8 @@ class TensorStorage {
     }
 
 public:
+    friend void TestTensor();
+
     friend class Tensor<T>;
 
     T *data;
@@ -99,6 +101,8 @@ class Tensor {
     }
 
 public:
+    friend void TestTensor();
+
     ~Tensor() {
         if (temp)return;
         resetStorage();
@@ -116,7 +120,19 @@ public:
         strides = new size_t[n];
         memcpy(strides, other.strides, n * sizeof(size_t));
         contiguous = other.contiguous;
+        temp = false;
         std::cout << "copyed" << std::endl;
+    }
+
+    Tensor clone() const {
+        assert(contiguous);
+        auto sizes = new size_t[n];
+        memcpy(sizes, this->sizes, n * sizeof(size_t));
+        auto strides = new size_t[n];
+        memcpy(strides, this->strides, n * sizeof(size_t));
+        auto storage = new TensorStorage<T>(size);
+        memcpy(storage->data, this->storage->data + offset, size * sizeof(T));
+        return Tensor(size, storage, n, 0, sizes, strides, true, false);
     }
 
     Tensor(initializer_list<size_t> sizes, initializer_list<T> data) {
