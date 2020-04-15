@@ -171,7 +171,7 @@ public:
         return Tensor{size, storage, n, offset, sizes, strides, contiguous, false};
     }
 
-    Tensor &detach() {
+    Tensor &divorce() {
         if (!temp)return *this;
         storage->link();
         auto sizes = new size_t[n];
@@ -282,6 +282,16 @@ public:
         return Tensor<T>(storage, 0, sizes);
     }
 
+    static Tensor<T> zeros_like(const Tensor<T> &other) {
+        assert(other.contiguous);
+        auto *storage = new TensorStorage<T>(other.size);
+        auto *sizes = new size_t[other.n];
+        memcpy(sizes, other.sizes, other.n * sizeof(size_t));
+        auto *strides = new size_t[other.n];
+        memcpy(strides, other.strides, other.n * sizeof(size_t));
+        return Tensor<T>(other.size, storage, other.n, 0, sizes, strides, true, false);
+    }
+
     static Tensor<T> scalar(const T &x) {
         auto *storage = new TensorStorage<T>(1);
         storage->data[0] = x;
@@ -309,6 +319,28 @@ public:
         return Tensor<T>(storage, 0, sizes);
     }
 
+#define SELF_OPERATOR(OP)\
+    Tensor &operator OP(const Tensor<T> &other) {\
+        assert(n == other.n);\
+        for (index_t i = 0; i < n; i++)assert(sizes[i] == other.sizes[i]);\
+        assert(contiguous);\
+        for (index_t i = 0; i < size; i++)storage->data[offset + i] OP other.storage->data[other.offset + i];\
+        return *this;\
+    }\
+
+    SELF_OPERATOR(+=)
+    SELF_OPERATOR(-=)
+    SELF_OPERATOR(*=)
+    SELF_OPERATOR(/=)
+    SELF_OPERATOR(%=)
+    SELF_OPERATOR(&=)
+    SELF_OPERATOR(|=)
+    SELF_OPERATOR(^=)
+
+    Tensor operator+(const Tensor<T> &other) {
+        auto result = clone();
+        return result += other;
+    }
 };
 
 

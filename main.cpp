@@ -7,15 +7,13 @@ using namespace std;
 
 auto fun() {
     auto x = Tensor<double>({2, 2, 2}, {1, 2, 3, 4, 5, 6, 7, 8});
-    return x[1].detach();
+    return x[1].divorce();
 }
 
 void TestTensor() {
     auto x = Tensor<double>({2, 2, 2}, {1, 2, 3, 4, 5, 6, 7, 8});
-    auto y = x[0].clone();
-    x[0] = {0, 0, 0, 0};
-    cout << y.storage->size() << endl;
-    cout << x[0].detach().storage->size() << endl;
+    cout << x << endl;
+//    x[0] = {0, 0, 0, 0};
 //    cout << fun() << endl;
 //    cout << x << endl;
 //    cout << x[1][0][1] << endl;
