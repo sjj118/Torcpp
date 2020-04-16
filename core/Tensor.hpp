@@ -8,9 +8,11 @@
 #include <initializer_list>
 #include <initializer_list>
 #include <functional>
+#include <memory>
 #include <iostream>
 
-using std::initializer_list;
+using std::default_delete;
+using std::shared_ptr;
 using std::initializer_list;
 using std::function;
 using std::istream;
@@ -19,65 +21,17 @@ using std::ostream;
 typedef int index_t;
 
 template<class T>
-class Tensor;
-
-template<class T>
-class TensorStorage;
-
-template<class T>
-class TensorStorage {
-    size_t _size, cnt = 0;
-
-    explicit TensorStorage(size_t size) : _size(size) {
-        data = new T[size];
-    }
-
-public:
-    friend void TestTensor();
-
-    friend class Tensor<T>;
-
-    T *data;
-
-    ~TensorStorage() {
-        delete[] data;
-    }
-
-    size_t size() const { return _size; }
-
-    void link() {
-        cnt++;
-        std::cout << "cnt: " << cnt << std::endl;
-    }
-
-    void delink() {
-        if (--cnt == 0)delete this;
-        std::cout << "cnt: " << cnt << std::endl;
-    }
-};
-
-template<class T>
 class Tensor {
     size_t size{};
-    TensorStorage<T> *storage{};
+    shared_ptr<T> storage;
     size_t n{}, offset{}, *sizes{}, *strides{};
     bool contiguous = true;
     bool temp = false;
 
-    Tensor(size_t size, TensorStorage<T> *storage, size_t n, size_t offset,
+    Tensor(size_t size, const shared_ptr<T> &storage, size_t n, size_t offset,
            size_t *sizes, size_t *strides, bool contiguous, bool temp)
-            : size(size), n(n), offset(offset),
+            : size(size), storage(storage), n(n), offset(offset),
               sizes(sizes), strides(strides), contiguous(contiguous), temp(temp) {
-        setStorage(storage);
-    }
-
-    void setStorage(TensorStorage<T> *storage) {
-        this->storage = storage;
-        if (!temp)storage->link();
-    }
-
-    void resetStorage() {
-        this->storage->delink();
     }
 
     static size_t *sizes2strides(size_t n, const size_t *sizes) {
@@ -87,10 +41,8 @@ class Tensor {
         return strides;
     }
 
-    Tensor(TensorStorage<T> *storage, size_t offset, initializer_list<size_t> sizes, size_t infer = 0) {
-        this->n = sizes.size();
-        setStorage(storage);
-        this->offset = offset;
+    Tensor(const shared_ptr<T> &storage, size_t offset, initializer_list<size_t> sizes, size_t infer = 0)
+            : storage(storage), offset(offset), n(sizes.size()) {
         this->sizes = new size_t[this->n];
         {
             index_t i = 0;
@@ -101,20 +53,13 @@ class Tensor {
     }
 
 public:
-    friend void TestTensor();
-
     ~Tensor() {
         if (temp)return;
-        resetStorage();
         delete[] this->sizes;
         delete[] this->strides;
     }
 
-    Tensor(const Tensor &other) {
-        size = other.size;
-        setStorage(other.storage);
-        n = other.n;
-        offset = other.offset;
+    Tensor(const Tensor &other) : size(other.size), storage(other.storage), n(other.n), offset(other.offset) {
         sizes = new size_t[n];
         memcpy(sizes, other.sizes, n * sizeof(size_t));
         strides = new size_t[n];
@@ -130,16 +75,16 @@ public:
         memcpy(sizes, this->sizes, n * sizeof(size_t));
         auto strides = new size_t[n];
         memcpy(strides, this->strides, n * sizeof(size_t));
-        auto storage = new TensorStorage<T>(size);
-        memcpy(storage->data, this->storage->data + offset, size * sizeof(T));
+        shared_ptr<T> storage(new T[size], default_delete<T[]>());
+        memcpy(storage.get(), this->storage.get() + offset, size * sizeof(T));
         return Tensor(size, storage, n, 0, sizes, strides, true, false);
     }
 
     Tensor(initializer_list<size_t> sizes, initializer_list<T> data) {
         size_t size = 1;
         for (auto &it:sizes)size *= it;
-        auto *storage = new TensorStorage<T>(size);
-        std::copy(data.begin(), data.end(), storage->data);
+        shared_ptr<T> storage(new T[size], default_delete<T[]>());
+        std::copy(data.begin(), data.end(), storage.get());
         new(this)Tensor(storage, 0, sizes);
     }
 
@@ -173,7 +118,6 @@ public:
 
     Tensor &divorce() {
         if (!temp)return *this;
-        storage->link();
         auto sizes = new size_t[n];
         memcpy(sizes, this->sizes, n * sizeof(size_t));
         auto strides = new size_t[n];
@@ -186,14 +130,14 @@ public:
 
     Tensor &operator=(T x) {
         assert(n == 0);
-        storage->data[offset] = x;
+        storage[offset] = x;
         return *this;
     }
 
     Tensor &operator=(initializer_list<T> data) {
         assert(size == data.size());
         assert(contiguous);
-        std::copy(data.begin(), data.end(), storage->data + offset);
+        std::copy(data.begin(), data.end(), storage.get() + offset);
         return *this;
     }
 
@@ -202,7 +146,7 @@ public:
         assert(n == other.n);
         for (index_t i = 0; i < n; i++)assert(sizes[i] == other.sizes[i]);
         assert(contiguous && other.contiguous);
-        memmove(storage->data + offset, other.storage->data + other.offset, size * sizeof(T));
+        memmove(storage.get() + offset, other.storage.get() + other.offset, size * sizeof(T));
         return *this;
     }
 
@@ -237,14 +181,14 @@ public:
         return Tensor<T>(size, storage, n, offset, sizes, sizes2strides(n, sizes), true, false);
     }
 
-    T &item() {
-        assert(n == 0);
-        return storage->data[offset];
+    T item() const {
+        assert(size == 1);
+        return storage[offset];
     }
 
     friend istream &operator>>(istream &in, const Tensor<T> &x) {
         if (x.n == 0) {
-            return in >> x.storage->data[x.offset];
+            return in >> x.storage[x.offset];
         }
         for (index_t i = 0; i < x.sizes[0]; i++) {
             in >> x[i];
@@ -254,7 +198,7 @@ public:
 
     void output(ostream &out, index_t inci) const {
         if (n == 0) {
-            out << storage->data[offset];
+            out << storage.get()[offset];
             return;
         }
         out << '[';
@@ -278,13 +222,13 @@ public:
     static Tensor<T> zeros(initializer_list<size_t> sizes) {
         size_t size = 1;
         for (auto &it:sizes)size *= it;
-        auto *storage = new TensorStorage<T>(size);
+        shared_ptr<T> storage(new T[size], default_delete<T[]>());
         return Tensor<T>(storage, 0, sizes);
     }
 
     static Tensor<T> zeros_like(const Tensor<T> &other) {
         assert(other.contiguous);
-        auto *storage = new TensorStorage<T>(other.size);
+        shared_ptr<T> storage(new T[other.size]);
         auto *sizes = new size_t[other.n];
         memcpy(sizes, other.sizes, other.n * sizeof(size_t));
         auto *strides = new size_t[other.n];
@@ -293,18 +237,18 @@ public:
     }
 
     static Tensor<T> scalar(const T &x) {
-        auto *storage = new TensorStorage<T>(1);
-        storage->data[0] = x;
+        shared_ptr<T> storage(new T[1], default_delete<T[]>());
+        storage.get()[0] = x;
         return Tensor<T>(storage, 0, {});
     }
 
     static Tensor<T> diag(initializer_list<T> diags) {
         size_t n = diags.size();
-        auto *storage = new TensorStorage<T>(n * n);
+        shared_ptr<T> storage(new T[n * n], default_delete<T[]>());
         {
             index_t i = 0;
             for (auto &it:diags) {
-                storage->data[i] = it;
+                storage.get()[i] = it;
                 i += n + 1;
             }
         }
@@ -314,8 +258,8 @@ public:
     static Tensor<T> rand(initializer_list<size_t> sizes, function<T()> randFunc) {
         size_t size = 1;
         for (auto &it:sizes)size *= it;
-        auto *storage = new TensorStorage<T>(size);
-        for (index_t i = 0; i < size; i++)storage->data[i] = randFunc();
+        shared_ptr<T> storage(new T[size], default_delete<T[]>());
+        for (index_t i = 0; i < size; i++)storage.get()[i] = randFunc();
         return Tensor<T>(storage, 0, sizes);
     }
 
@@ -324,17 +268,25 @@ public:
         assert(n == other.n);\
         for (index_t i = 0; i < n; i++)assert(sizes[i] == other.sizes[i]);\
         assert(contiguous);\
-        for (index_t i = 0; i < size; i++)storage->data[offset + i] OP other.storage->data[other.offset + i];\
+        for (index_t i = 0; i < size; i++)storage[offset + i] OP other.storage[other.offset + i];\
         return *this;\
     }\
 
+
     SELF_OPERATOR(+=)
+
     SELF_OPERATOR(-=)
+
     SELF_OPERATOR(*=)
+
     SELF_OPERATOR(/=)
+
     SELF_OPERATOR(%=)
+
     SELF_OPERATOR(&=)
+
     SELF_OPERATOR(|=)
+
     SELF_OPERATOR(^=)
 
     Tensor operator+(const Tensor<T> &other) {
