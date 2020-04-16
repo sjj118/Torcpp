@@ -10,7 +10,10 @@
 #include <functional>
 #include <memory>
 #include <iostream>
+#include <cassert>
+#include <cstring>
 
+using std::memcpy;
 using std::default_delete;
 using std::shared_ptr;
 using std::initializer_list;
@@ -26,12 +29,11 @@ class Tensor {
     shared_ptr<T> storage;
     size_t n{}, offset{}, *sizes{}, *strides{};
     bool contiguous = true;
-    bool temp = false;
 
     Tensor(size_t size, const shared_ptr<T> &storage, size_t n, size_t offset,
-           size_t *sizes, size_t *strides, bool contiguous, bool temp)
+           size_t *sizes, size_t *strides, bool contiguous)
             : size(size), storage(storage), n(n), offset(offset),
-              sizes(sizes), strides(strides), contiguous(contiguous), temp(temp) {
+              sizes(sizes), strides(strides), contiguous(contiguous) {
     }
 
     static size_t *sizes2strides(size_t n, const size_t *sizes) {
@@ -52,9 +54,16 @@ class Tensor {
         this->size = this->strides[0] * this->sizes[0];
     }
 
+    class accessor;
+
+    class iterator;
+
+    accessor operator&() {
+        return accessor(this, 0, offset);
+    }
+
 public:
     ~Tensor() {
-        if (temp)return;
         delete[] this->sizes;
         delete[] this->strides;
     }
@@ -65,8 +74,6 @@ public:
         strides = new size_t[n];
         memcpy(strides, other.strides, n * sizeof(size_t));
         contiguous = other.contiguous;
-        temp = false;
-        std::cout << "copyed" << std::endl;
     }
 
     Tensor clone() const {
@@ -77,7 +84,7 @@ public:
         memcpy(strides, this->strides, n * sizeof(size_t));
         shared_ptr<T> storage(new T[size], default_delete<T[]>());
         memcpy(storage.get(), this->storage.get() + offset, size * sizeof(T));
-        return Tensor(size, storage, n, 0, sizes, strides, true, false);
+        return Tensor(size, storage, n, 0, sizes, strides, true);
     }
 
     Tensor(initializer_list<size_t> sizes, initializer_list<T> data) {
@@ -88,14 +95,11 @@ public:
         new(this)Tensor(storage, 0, sizes);
     }
 
-    Tensor operator[](index_t ind) const {
-        assert(n > 0);
-        assert(ind < sizes[0]);
-        return Tensor{size / this->sizes[0], storage, n - 1, offset + ind * this->strides[0],
-                      sizes + 1, strides + 1, contiguous, true};
+    accessor operator[](index_t ind) {
+        return (&*this)[ind];
     }
 
-    Tensor operator[](initializer_list<index_t> inds) const {
+    Tensor operator[](initializer_list<index_t> inds) {
         assert(inds.size() <= n);
         size_t offset = this->offset;
         size_t size = this->size;
@@ -113,19 +117,11 @@ public:
         memcpy(sizes, this->sizes + inds.size(), n * sizeof(size_t));
         auto strides = new size_t[n];
         memcpy(strides, this->strides + inds.size(), n * sizeof(size_t));
-        return Tensor{size, storage, n, offset, sizes, strides, contiguous, false};
+        return Tensor{size, storage, n, offset, sizes, strides, contiguous};
     }
 
     Tensor &divorce() {
-        if (!temp)return *this;
-        auto sizes = new size_t[n];
-        memcpy(sizes, this->sizes, n * sizeof(size_t));
-        auto strides = new size_t[n];
-        memcpy(strides, this->strides, n * sizeof(size_t));
-        this->sizes = sizes;
-        this->strides = strides;
-        temp = false;
-        return *this;
+        //TODO
     }
 
     Tensor &operator=(T x) {
@@ -196,26 +192,27 @@ public:
         return in;
     }
 
-    void output(ostream &out, index_t inci) const {
-        if (n == 0) {
+    void output(ostream &out, size_t dim, size_t offset) const {
+        if (n == dim) {
             out << storage.get()[offset];
             return;
         }
         out << '[';
-        (*this)[0].output(out, inci + 1);
-        for (index_t i = 1; i < sizes[0]; i++) {
+        output(out, dim + 1, offset);
+        for (index_t i = 1; i < sizes[dim]; i++) {
             out << ',';
-            if (n > 1) {
+            if (n - dim > 1) {
                 out << '\n';
-                for (index_t j = 0; j < inci; j++)out << ' ';
+                for (index_t j = 0; j <= dim; j++)out << ' ';
             }
-            (*this)[i].output(out, inci + 1);
+            offset += strides[dim];
+            output(out, dim + 1, offset);
         }
         out << ']';
     }
 
     friend ostream &operator<<(ostream &out, const Tensor<T> &x) {
-        x.output(out, 1);
+        x.output(out, 0, x.offset);
         return out;
     }
 
@@ -295,5 +292,43 @@ public:
     }
 };
 
+template<class T>
+class Tensor<T>::accessor {
+    Tensor<T> *tensor;
+    size_t dim, offset;
+
+    accessor(Tensor<T> *tensor, size_t dim, size_t offset) : tensor(tensor), dim(dim), offset(offset) {}
+
+    accessor(accessor &&other) = default;
+
+public:
+    accessor(const accessor &other) = delete;
+
+    friend class Tensor;
+
+    accessor operator[](index_t ind) {
+        assert(dim < tensor->n);
+        if (ind < 0)ind += tensor->n;
+        assert(0 <= ind && ind < tensor->n);
+        offset += ind * tensor->strides[dim];
+        dim++;
+        return std::move(*this);
+    }
+
+    Tensor<T> operator*() {
+        size_t n = tensor->n - dim;
+        auto sizes = new size_t[n];
+        memcpy(sizes, tensor->sizes + dim, n * sizeof(size_t));
+        auto strides = new size_t[n];
+        memcpy(strides, tensor->strides + dim, n * sizeof(size_t));
+        size_t size = 1;
+        for (index_t i = 0; i < n; i++)size *= sizes[i];
+        return Tensor(size, tensor->storage, n, offset, sizes, strides, tensor->contiguous);
+    }
+
+    Tensor<T> *operator->() {
+        return &**this;
+    }
+};
 
 #endif //TORCPP_TENSOR_H
