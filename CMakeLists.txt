@@ -3,4 +3,6 @@ project(torcpp)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(test test/catch.hpp test/TensorTest.cpp)
+add_executable(test test/TensorTest.cpp)
+
+add_executable(torcpp main.cpp)
