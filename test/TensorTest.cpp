@@ -1,7 +1,7 @@
 #define CATCH_CONFIG_MAIN
 
 #include "catch.hpp"
-#include "../core/Tensor.hpp"
+#include "../core/Tensor.h"
 
 using namespace std;
 

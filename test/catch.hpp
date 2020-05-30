@@ -4196,7 +4196,7 @@ namespace Generators {
                 return m_current_repeat < m_target_repeats;
             }
 
-            // In the second case, we need to move indices forward and check that we haven't run up against the end
+            // In the second case, we need to move indices map and check that we haven't run up against the end
             ++m_repeat_index;
             if (m_repeat_index == m_returned.size()) {
                 m_repeat_index = 0;
@@ -7365,7 +7365,7 @@ namespace Catch {
                 template <typename... Args>
                 void construct(Args&&... args)
                 {
-                    new (&data) T(std::forward<Args>(args)...);
+                    new (&data) T(std::map<Args>(args)...);
                 }
 
                 template <bool AllowManualDestruction = !Destruct>
