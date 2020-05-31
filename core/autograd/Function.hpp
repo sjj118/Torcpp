@@ -14,14 +14,14 @@ class Variable;
 template<class T>
 class Function {
 public:
-    vector<shared_ptr<Function<T>>> next_edges;
+    vector<shared_ptr<Function<T>>> next_functions;
     Tensor<T> grad_accumulator;
     size_t degree = 0;
 
     explicit Function<T>(const vector<size_t> &sizes) : grad_accumulator(Tensor<T>::zeros(sizes)) {}
 
     void add_edge(shared_ptr<Function<T>> edge) {
-        next_edges.push_back(edge);
+        next_functions.push_back(edge);
     }
 
     virtual Tensor<T> apply(vector<Tensor<T>> &&inputs) = 0;
@@ -29,17 +29,17 @@ public:
     virtual vector<Tensor<T>> calc_grads(const Tensor<T> &grad) = 0;
 
     void calc_degree() {
-        for (auto &it:next_edges)
+        for (auto &it:next_functions)
             if (it && it->degree++ == 0)it->calc_degree();
     }
 
     virtual void backward() {
         auto grads = calc_grads(grad_accumulator);
-        assert(grads.size() == next_edges.size());
+        assert(grads.size() == next_functions.size());
         for (index_t i = 0; i < grads.size(); i++) {
-            if (next_edges[i]) {
-                next_edges[i]->grad_accumulator += grads[i];
-                if (--next_edges[i]->degree == 0)next_edges[i]->backward();
+            if (next_functions[i]) {
+                next_functions[i]->grad_accumulator += grads[i];
+                if (--next_functions[i]->degree == 0)next_functions[i]->backward();
             }
         }
     }

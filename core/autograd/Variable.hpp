@@ -218,16 +218,22 @@ public:
         return 1 - t * t;
     })
 
+    MAP_FUNCTION(sin, { return std::sin(x); }, { return std::cos(x); })
+
+    MAP_FUNCTION(cos, { return std::cos(x); }, { return -std::sin(x); })
+
 #undef MAP_FUNCTION
 
     Variable softmax() const {
-        auto _exp = this->exp();
+        auto _nor = *this - tensor.max();
+        auto _exp = _nor.exp();
         auto _sum = _exp.sum();
         return _exp / _sum;
     }
 
     Variable softmax(index_t dim) const {
-        auto _exp = this->exp();
+        auto _nor = *this - tensor.max();
+        auto _exp = _nor.exp();
         auto _sum = _exp.sum(dim);
         return _exp / _sum;
     }

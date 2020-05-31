@@ -762,7 +762,7 @@ public:
 
     REDUCE_FUNCTION(any, { return a || b; })
 
-    REDUCE_FUNCTION(XOR, { return a ^ b; })
+    REDUCE_FUNCTION(xor_sum, { return a ^ b; })
 
 
 #undef REDUCE_FUNCTION
@@ -805,16 +805,22 @@ public:
 
     MAP_FUNCTION(tanh, { return std::tanh(x); })
 
+    MAP_FUNCTION(sin, { return std::sin(x); })
+
+    MAP_FUNCTION(cos, { return std::cos(x); })
+
 #undef MAP_FUNCTION
 
     Tensor<T> softmax() const {
-        auto _exp = this->exp();
+        auto _nor = *this - max();
+        auto _exp = _nor.exp();
         auto _sum = _exp.sum();
         return _exp / _sum;
     }
 
     Tensor<T> softmax(index_t dim) const {
-        auto _exp = this->exp();
+        auto _nor = *this - max();
+        auto _exp = _nor.exp();
         auto _sum = _exp.sum(dim);
         return _exp / _sum;
     }

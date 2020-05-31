@@ -35,16 +35,14 @@ int main() {
     }
     auto net = XorNet();
     auto criterion = [](const Variable<double> &output, const Variable<double> &target) -> Variable<double> {
-//        auto det = target - output;
-//        auto loss = det * det / 2.0;
         auto loss = -(target * output.log() + (1 - target) * (1 - output).log());
         return loss.mean();
     };
     auto opt = SGD<double>(net.parameters, lr);
-    for (int epoch = 0; epoch < 600; epoch++) {
+    for (int epoch = 0; epoch < 1000; epoch++) {
         if (epoch % 200 == 199)opt.lr /= 10;
         auto s_inputs = inputs_.shuffle().view({0, batch_size, n, 1});
-        auto labels = s_inputs.XOR(2).astype<double>();
+        auto labels = s_inputs.xor_sum(2).astype<double>();
         auto inputs = s_inputs.astype<double>();
         double running_loss = 0;
         int total = 0, correct = 0;
@@ -58,7 +56,7 @@ int main() {
             opt.zero_grad();
             running_loss += loss.item();
             total += input.sizes[0];
-            auto predicted = (output.tensor > 0.5).astype<int>();
+            auto predicted = (output.tensor > 0.65).astype<int>();
             correct += (predicted == label.astype<int>()).astype<int>().sum().item();
         }
         cout << epoch << " " << 100.0 * correct / total << "% " << running_loss / inputs.sizes[0] << endl;
@@ -71,6 +69,7 @@ int main() {
         int target = 0;
         for (auto it:vec)target ^= it;
         auto output = net(input).item();
+//        cout << "[" << target << "," << output << "],";
         cout << input << " " << target << " " << output << endl;
     }
     return 0;
