@@ -1,4 +1,4 @@
-# 简介
+简介
 
 在 C++ 中对 Pytorch 基本功能的简易实现。
 
@@ -238,7 +238,7 @@ Variable x = a.autograd();
 Variable 在运算时会自动构建运算图，调用 backward 方法进行反向传播，导数记录在成员变量 Variable.grad 内。
 
 ```c++
-auto y = (x * x + x).sum();		// 导数应为 2x+1
+auto y = (x * x + x).sum();     // 导数应为 2x+1
 y.backward();
 cout << x.grad << endl;
 /*
@@ -246,7 +246,7 @@ cout << x.grad << endl;
  [9,11,13]]
 */
 
-x.grad.zero_();					// 清空导数
+x.grad.zero_();                 // 清空导数
 x.prod().backward();
 cout << x.grad << endl;
 /*
@@ -274,7 +274,7 @@ public:
     Variable<double> b = Tensor<double>::rand({1, 1}, rd::randn).autograd();
 
     XorNet() : Module<double>() {
-        add_parameters({W, c, w, b});	// 将这些 Variable 加入该模型的参数列表
+        add_parameters({W, c, w, b});    // 将这些 Variable 加入该模型的参数列表
     }
 
     Variable<double> forward(Variable<double> x) const override {
@@ -302,15 +302,15 @@ auto opt = SGD<double>(net.parameters, lr);
 for (int batch = 0; batch < inputs.sizes[0]; batch++) {
     auto input = inputs[batch];
     auto label = labels[batch];
-    auto output = net(input);				// 前向传播
-    auto loss = criterion(output, label);	// 计算损失
-    loss.backward();						// 反向传播
-    opt.step();								// 一轮优化
-    opt.zero_grad();						// 清空导数
+    auto output = net(input);               // 前向传播
+    auto loss = criterion(output, label);   // 计算损失
+    loss.backward();                        // 反向传播
+    opt.step();                             // 一轮优化
+    opt.zero_grad();                        // 清空导数
     running_loss += loss.item();
     total += input.sizes[0];
     auto predicted = (output.tensor > 0.65).astype<int>();
-	correct += (predicted == label.astype<int>()).astype<int>().sum().item();
+    correct += (predicted == label.astype<int>()).astype<int>().sum().item();
 }
 ```
 
