@@ -1,16 +1,14 @@
-# Torcpp
-
-## 简介
+# 简介
 
 在 C++ 中对 Pytorch 基本功能的简易实现。
 
-## 主要模块
+# 主要模块
 
 - Tensor 类：基础设施，实现了多维数组
 - autograd 模块：实现了自动求导功能
 - nn 模块：高层模块：实现了部分模型、优化器、损失函数（目前只实现了很少的算法，其它优化器、损失函数等都可以较容易的添加）
 
-## 使用示例
+# 使用示例
 
 以下示例的代码都可以在 `example/tutorial.cpp` 中找到。
 
@@ -20,7 +18,7 @@
 #include "torcpp.h"
 ```
 
-### Tensor
+## Tensor
 
 Tensor 类是基础核心类，实现了一个多维数组，相当于 numpy 中的 ndarray，pytorch 中的 tensor（不包括自动求导）。
 
@@ -229,7 +227,7 @@ cout << a.reduce([](double x, double y) { return int(round(x)) | int(round(y)); 
 */
 ```
 
-### autograd
+## autograd
 
 使用 Tensor.autograd 方法将 Tensor 转换成 Variable 并记录导数：
 
@@ -259,7 +257,7 @@ cout << x.grad << endl;
 
 Tensor 类支持的函数，Variable 类大部分都支持并且支持自动微分。
 
-### nn
+## nn
 
 此部分的完整代码见 `example/xor.cpp`，这是一个使用该库构建网络学习异或问题的实例。
 
