@@ -1,3 +1,6 @@
+/*
+ * 测试功能暂未实现
+ */
 #define CATCH_CONFIG_MAIN
 
 #include "catch.hpp"
