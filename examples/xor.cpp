@@ -1,6 +1,6 @@
 #include<iostream>
 #include<random>
-#include"torcpp.h"
+#include"../torcpp.h"
 
 using namespace std;
 
@@ -19,7 +19,7 @@ public:
     }
 
     Variable<double> forward(Variable<double> x) const override {
-        x = (W % x + c).relu();
+        x = (W % x + c).tanh();
         x = (w % x + b).sigmoid();
         return x;
     }
@@ -34,7 +34,7 @@ int main() {
         inputs_[i] = vec;
     }
     auto net = XorNet();
-    auto criterion = [](const Variable<double> &output, const Variable<double> &target) -> Variable<double> {
+    auto criterion = [](auto &output, auto &target) -> auto {
         auto loss = -(target * output.log() + (1 - target) * (1 - output).log());
         return loss.mean();
     };
@@ -61,16 +61,16 @@ int main() {
         }
         cout << epoch << " " << 100.0 * correct / total << "% " << running_loss / inputs.sizes[0] << endl;
     }
-    for (int i = 0; i < (1 << n); i++) {
-        vector<int> vec(n);
-        unsigned int t = i;
-        for (int j = 0; j < n; j++)vec[j] = t & 1, t >>= 1;
-        auto input = Tensor<int>({n}, vec).astype<double>();
-        int target = 0;
-        for (auto it:vec)target ^= it;
-        auto output = net(input).item();
+//    for (int i = 0; i < (1 << n); i++) {
+//        vector<int> vec(n);
+//        unsigned int t = i;
+//        for (int j = 0; j < n; j++)vec[j] = t & 1, t >>= 1;
+//        auto input = Tensor<int>({n}, vec).astype<double>();
+//        int target = 0;
+//        for (auto it:vec)target ^= it;
+//        auto output = net(input).item();
 //        cout << "[" << target << "," << output << "],";
-        cout << input << " " << target << " " << output << endl;
-    }
+//        cout << input << " " << target << " " << output << endl;
+//    }
     return 0;
 }
